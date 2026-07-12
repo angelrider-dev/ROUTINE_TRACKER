@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/task.dart';
 import '../theme/app_theme.dart';
-import 'staggered_fade_in.dart';
 
 const double _pixelsPerHour = 64;
 const double _hourLabelWidth = 40;
@@ -137,21 +136,26 @@ class _TimelineViewState extends State<TimelineView> {
                       ),
                     ),
 
-                  // Task cards, staggered fade-in on first appearance
+                  // Task cards. Entrance is handled by the parent
+                  // AnimatedSwitcher's fade+slide — deliberately NOT
+                  // wrapping each card in its own staggered animation here.
+                  // On a switch between List/Timeline, that used to mean
+                  // one AnimatedSwitcher animation PLUS a fresh
+                  // StaggeredFadeIn ticker per card PLUS this card's own
+                  // press/completion controllers, all firing at once —
+                  // visibly janky on lower-end devices. One shared
+                  // transition for the whole view reads just as
+                  // intentional with far less simultaneous animation work.
                   for (int i = 0; i < scheduled.length; i++)
                     Positioned(
                       top: _yFor(scheduled[i].scheduledTime!, rangeStart) - 12,
                       left: _hourLabelWidth + 8,
                       right: 0,
-                      child: StaggeredFadeIn(
-                        index: i,
-                        delayPerItemMs: 30,
-                        child: _TimelineTaskCard(
-                          task: scheduled[i],
-                          done: _isDone(scheduled[i]),
-                          onToggle: () => widget.onToggle(scheduled[i], _isDone(scheduled[i])),
-                          onEdit: widget.onEdit == null ? null : () => widget.onEdit!(scheduled[i]),
-                        ),
+                      child: _TimelineTaskCard(
+                        task: scheduled[i],
+                        done: _isDone(scheduled[i]),
+                        onToggle: () => widget.onToggle(scheduled[i], _isDone(scheduled[i])),
+                        onEdit: widget.onEdit == null ? null : () => widget.onEdit!(scheduled[i]),
                       ),
                     ),
 

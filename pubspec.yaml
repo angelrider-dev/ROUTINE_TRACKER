@@ -48,6 +48,16 @@ dev_dependencies:
   flutter_lints: ^4.0.0
   build_runner: ^2.4.11
   drift_dev: ^2.18.0
+  flutter_launcher_icons: ^0.14.1
+
 
 flutter:
   uses-material-design: true
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/app_icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#0F0F1A"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
