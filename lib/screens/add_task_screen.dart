@@ -29,6 +29,12 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
   late bool _isHabit;
   late bool _reminderEnabled;
 
+  /// Only meaningful (and only shown in the UI) when [_recurrence] is
+  /// [RecurrenceType.oneOff] — the specific calendar day this one-off task
+  /// is scheduled for. Defaults to today for new tasks, or the original
+  /// task's date when editing.
+  late DateTime _oneOffDate;
+
   late final String _initialSnapshot;
   bool _saving = false;
 
@@ -43,6 +49,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
     _recurrence = t?.recurrence ?? RecurrenceType.daily;
     _customDays = (t?.customDays ?? const []).toSet();
     _scheduledTime = t?.scheduledTime;
+    _oneOffDate = t?.createdAt ?? DateTime.now();
     _isHabit = t?.isHabit ?? true;
     _reminderEnabled = t?.reminderEnabled ?? false;
     _initialSnapshot = _snapshot();
@@ -51,7 +58,8 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
 
   String _snapshot() =>
       '${_titleController.text.trim()}|$_category|$_recurrence|${(_customDays.toList()..sort())}|'
-      '${_scheduledTime?.hour}:${_scheduledTime?.minute}|$_isHabit|$_reminderEnabled';
+      '${_scheduledTime?.hour}:${_scheduledTime?.minute}|$_isHabit|$_reminderEnabled|'
+      '${_recurrence == RecurrenceType.oneOff ? _oneOffDate.toIso8601String().split('T').first : ''}';
 
   bool get _isDirty => _snapshot() != _initialSnapshot;
   bool get _titleValid => _titleController.text.trim().isNotEmpty;
@@ -100,9 +108,14 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
       id: widget.existingTask?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
       title: _titleController.text.trim(),
       category: _category,
-      // Preserve the original creation date on edit — History/Stats
-      // exclude days before a task existed from its completion-rate math.
-      createdAt: widget.existingTask?.createdAt ?? DateTime.now(),
+      // For recurring tasks, this is purely the creation date — preserved
+      // across edits since History/Stats exclude days before a task
+      // existed from its completion-rate math. For one-off tasks it also
+      // doubles as the actual scheduled day, so it comes from the date
+      // picker instead of always defaulting to "today".
+      createdAt: _recurrence == RecurrenceType.oneOff
+          ? _oneOffDate
+          : (widget.existingTask?.createdAt ?? DateTime.now()),
       recurrence: _recurrence,
       customDays: _recurrence == RecurrenceType.custom ? _customDays.toList() : null,
       scheduledTime: _scheduledTime,
@@ -163,6 +176,27 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
   Future<void> _pickTime() async {
     final picked = await showTimePicker(context: context, initialTime: _scheduledTime ?? TimeOfDay.now());
     if (picked != null) setState(() => _scheduledTime = picked);
+  }
+
+  Future<void> _pickOneOffDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _oneOffDate.isBefore(DateTime(now.year, now.month, now.day))
+          ? now
+          : _oneOffDate,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(now.year + 5),
+    );
+    if (picked != null) setState(() => _oneOffDate = picked);
+  }
+
+  static String _formatOneOffDate(DateTime d) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${months[d.month - 1]} ${d.day}, ${d.year}';
   }
 
   Future<void> _pickRecurrence() async {
@@ -292,6 +326,18 @@ onPopInvokedWithResult: (didPop, result) {
                                       );
                                     }),
                                   ),
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+                        AnimatedSize(
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeOut,
+                          child: _recurrence == RecurrenceType.oneOff
+                              ? _FormRow(
+                                  icon: Icons.event,
+                                  label: 'Date',
+                                  value: _formatOneOffDate(_oneOffDate),
+                                  onTap: _pickOneOffDate,
                                 )
                               : const SizedBox.shrink(),
                         ),
